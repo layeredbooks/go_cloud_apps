@@ -1,0 +1,62 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: canvas
+      POSTGRES_PASSWORD: 123
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+  elasticmq:
+    image: softwaremill/elasticmq-native
+    ports:
+      - 9324:9324
+      - 9325:9325
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - prometheus:/prometheus
+      - ./prometheus/development.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+  alertmanager:
+    image: prom/alertmanager
+    ports:
+      - 9093:9093
+    volumes:
+      - alertmanager:/alertmanager
+      - ./alertmanager/development.yml:/etc/alertmanager/alertmanager.yml
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/etc/dashboards
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+  postgres-test:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: template1
+    ports:
+      - 5433:5432
+  elasticmq-test:
+    image: softwaremill/elasticmq-native
+    ports:
+      - 9326:9324
+volumes:
+  postgres:
+  prometheus:
+  alertmanager:
+  grafana:
