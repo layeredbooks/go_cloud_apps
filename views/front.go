@@ -14,7 +14,7 @@ func FrontPage() g.Node {
 		P(g.Raw(`Do you have problems? We also had problems.`)),
 		P(g.Raw(`Then we created the <em>canvas</em> app, and now we don't! 😬`)),
 
-		H2(g.Text(`Do you want to know more?`)),
+		H2(g.Text(`Do you want to know even more?`)),
 		P(g.Text(`Sign up to our newsletter below.`)),
 
 		FormEl(Action("/newsletter/signup"), Method("post"), Class("flex items-center max-w-md"),
