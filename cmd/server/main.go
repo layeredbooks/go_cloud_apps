@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"canvas/jobs"
 	"canvas/messaging"
 	"canvas/server"
 	"canvas/storage"
@@ -40,9 +41,7 @@ func start() int {
 		fmt.Println("Error setting up the logger:", err)
 		return 1
 	}
-
 	log = log.With(zap.String("release", release))
-
 	defer func() {
 		// If we cannot sync, there's probably something wrong with outputting logs,
 		// so we probably cannot write using fmt.Println either. So just ignore the error.
@@ -61,31 +60,48 @@ func start() int {
 		return 1
 	}
 
+	queue := createQueue(log, awsConfig)
+
 	s := server.New(server.Options{
 		Database: createDatabase(log),
 		Host:     host,
 		Log:      log,
 		Port:     port,
-		Queue:    createQueue(log, awsConfig),
+		Queue:    queue,
 	})
 
-	var eg errgroup.Group
+	r := jobs.NewRunner(jobs.NewRunnerOptions{
+		Emailer: createEmailer(log, host, port),
+		Log:     log,
+		Queue:   queue,
+	})
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		<-ctx.Done()
+		if err := s.Start(); err != nil {
+			log.Info("Error starting server", zap.Error(err))
+			return err
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		r.Start(ctx)
+		return nil
+	})
+
+	<-ctx.Done()
+
+	eg.Go(func() error {
 		if err := s.Stop(); err != nil {
 			log.Info("Error stopping server", zap.Error(err))
 			return err
 		}
 		return nil
 	})
-
-	if err := s.Start(); err != nil {
-		log.Info("Error starting server", zap.Error(err))
-		return 1
-	}
 
 	if err := eg.Wait(); err != nil {
 		return 1
@@ -155,22 +171,16 @@ func createQueue(log *zap.Logger, awsConfig aws.Config) *messaging.Queue {
 	})
 }
 
-// func getStringOrDefault(name, defaultV string) string {
-// 	v, ok := os.LookupEnv(name)
-// 	if !ok {
-// 		return defaultV
-// 	}
-// 	return v
-// }
-
-// func getIntOrDefault(name string, defaultV int) int {
-// 	v, ok := os.LookupEnv(name)
-// 	if !ok {
-// 		return defaultV
-// 	}
-// 	vAsInt, err := strconv.Atoi(v)
-// 	if err != nil {
-// 		return defaultV
-// 	}
-// 	return vAsInt
-// }
+func createEmailer(log *zap.Logger, host string, port int) *messaging.Emailer {
+	return messaging.NewEmailer(messaging.NewEmailerOptions{
+		BaseURL:            env.GetStringOrDefault("BASE_URL", fmt.Sprintf("http://%v:%v", host, port)),
+		Log:                log,
+		MarketingEmailName: env.GetStringOrDefault("MARKETING_EMAIL_NAME", "Canvas bot"),
+		MarketingEmailAddress: env.GetStringOrDefault("MARKETING_EMAIL_ADDRESS",
+			"bot@marketing.example.com"),
+		Token:                  env.GetStringOrDefault("POSTMARK_TOKEN", ""),
+		TransactionalEmailName: env.GetStringOrDefault("TRANSACTIONAL_EMAIL_NAME", "Canvas bot"),
+		TransactionalEmailAddress: env.GetStringOrDefault("TRANSACTIONAL_EMAIL_ADDRESS",
+			"bot@transactional.example.com"),
+	})
+}
