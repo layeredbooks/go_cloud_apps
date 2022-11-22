@@ -145,3 +145,19 @@ func getEmail(path string, keywords map[string]string) string {
 
 	return emailString
 }
+
+// SendNewsletterWelcomeEmail with just the web app URL.
+func (e *Emailer) SendNewsletterWelcomeEmail(ctx context.Context, to model.Email) error {
+	keywords := map[string]string{
+		"base_url": e.baseURL,
+	}
+
+	return e.send(ctx, requestBody{
+		MessageStream: marketingMessageStream,
+		From:          e.marketingFrom,
+		To:            to.String(),
+		Subject:       "Welcome to the Canvas newsletter",
+		HtmlBody:      getEmail("welcome_email.html", keywords),
+		TextBody:      getEmail("welcome_email.txt", keywords),
+	})
+}

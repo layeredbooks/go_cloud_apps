@@ -181,6 +181,6 @@ func createEmailer(log *zap.Logger, host string, port int) *messaging.Emailer {
 		Token:                  env.GetStringOrDefault("POSTMARK_TOKEN", ""),
 		TransactionalEmailName: env.GetStringOrDefault("TRANSACTIONAL_EMAIL_NAME", "Canvas bot"),
 		TransactionalEmailAddress: env.GetStringOrDefault("TRANSACTIONAL_EMAIL_ADDRESS",
-			"bot@transactional.example.com"),
+			"ola@layeredbooks.com"),
 	})
 }
